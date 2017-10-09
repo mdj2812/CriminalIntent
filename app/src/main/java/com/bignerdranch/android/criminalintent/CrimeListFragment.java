@@ -26,6 +26,8 @@ public class CrimeListFragment extends Fragment {
     private RecyclerView mCrimeRecyclerView;
     private CrimeAdapter mAdapter;
 
+    private int mLastUpdatedPosition = -1;
+
     @Nullable
     @Override
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -52,6 +54,10 @@ public class CrimeListFragment extends Fragment {
             mAdapter = new CrimeAdapter(crimes);
             mCrimeRecyclerView.setAdapter(mAdapter);
         } else {
+            if (mLastUpdatedPosition > -1) {
+                mAdapter.notifyItemChanged(mLastUpdatedPosition);
+                mLastUpdatedPosition = -1;
+            }
             mAdapter.notifyDataSetChanged();
         }
     }
@@ -84,6 +90,7 @@ public class CrimeListFragment extends Fragment {
         public void onClick(View v) {
             Intent intent = CrimeActivity.newIntent(getActivity(), mCrime.getId());
             startActivityForResult(intent, REQUEST_CRIME);
+            mLastUpdatedPosition = this.getAdapterPosition();
         }
     }
 
