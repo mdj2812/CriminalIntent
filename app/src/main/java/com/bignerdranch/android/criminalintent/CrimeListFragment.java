@@ -19,6 +19,9 @@ import java.util.List;
 
 public class CrimeListFragment extends Fragment {
 
+    private static final int CRIME_HOLDER_VIEW_TYPE = 0;
+    private static final int REQUIRES_POLICE_CRIME_HOLDER_VIEW_TYPE = 1;
+
     private RecyclerView mCrimeRecyclerView;
     private CrimeAdapter mAdapter;
 
@@ -43,19 +46,33 @@ public class CrimeListFragment extends Fragment {
         mCrimeRecyclerView.setAdapter(mAdapter);
     }
 
-    private class CrimeHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
+    private abstract class CrimeHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
 
-        private Crime mCrime;
+        protected Crime mCrime;
 
-        private TextView mTitleTextView;
-        private TextView mDateTextView;
+        protected TextView mTitleTextView;
+        protected TextView mDateTextView;
 
-        public CrimeHolder(LayoutInflater inflater, ViewGroup parent) {
-            super(inflater.inflate(R.layout.list_item_crime, parent, false));
+        public CrimeHolder(View itemView) {
+            super(itemView);
             itemView.setOnClickListener(this);
 
             mTitleTextView = (TextView) itemView.findViewById(R.id.crime_title);
             mDateTextView = (TextView) itemView.findViewById(R.id.crime_date);
+        }
+
+        public abstract void bind(Crime crime);
+
+        @Override
+        public void onClick(View v) {
+            Toast.makeText(getActivity(), mCrime.getTitle() + " clicked!", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private class NotRequiresPoliceCrimeHolder extends CrimeHolder {
+
+        public NotRequiresPoliceCrimeHolder(LayoutInflater inflater, ViewGroup parent) {
+            super(inflater.inflate(R.layout.list_item_crime, parent, false));
         }
 
         public void bind(Crime crime) {
@@ -63,10 +80,23 @@ public class CrimeListFragment extends Fragment {
             mTitleTextView.setText(mCrime.getTitle());
             mDateTextView.setText(mCrime.getDate().toString());
         }
+    }
 
-        @Override
-        public void onClick(View v) {
-            Toast.makeText(getActivity(), mCrime.getTitle() + " clicked!", Toast.LENGTH_SHORT).show();
+    private class RequiresPoliceCrimeHolder extends CrimeHolder {
+
+        private TextView mRequiresPoliceTextView;
+
+        public RequiresPoliceCrimeHolder(LayoutInflater inflater, ViewGroup parent) {
+            super(inflater.inflate(R.layout.list_item_requires_police_crime, parent, false));
+
+            mRequiresPoliceTextView = (TextView) itemView.findViewById(R.id.crime_requires_police);
+        }
+
+        public void bind(Crime crime) {
+            mCrime = crime;
+            mTitleTextView.setText(mCrime.getTitle());
+            mDateTextView.setText(mCrime.getDate().toString());
+            mRequiresPoliceTextView.setText(mCrime.isRequiresPolice() ? "Requires Police" : "Not Requires Police");
         }
     }
 
@@ -82,7 +112,15 @@ public class CrimeListFragment extends Fragment {
         public CrimeHolder onCreateViewHolder(ViewGroup parent, int viewType) {
             LayoutInflater layoutInflater = LayoutInflater.from(getActivity());
 
-            return new CrimeHolder(layoutInflater, parent);
+            switch (viewType) {
+                case CRIME_HOLDER_VIEW_TYPE:
+                    return new NotRequiresPoliceCrimeHolder(layoutInflater, parent);
+                case REQUIRES_POLICE_CRIME_HOLDER_VIEW_TYPE:
+                    return new RequiresPoliceCrimeHolder(layoutInflater, parent);
+                default:
+                    return new NotRequiresPoliceCrimeHolder(layoutInflater, parent);
+            }
+
         }
 
         @Override
@@ -94,6 +132,11 @@ public class CrimeListFragment extends Fragment {
         @Override
         public int getItemCount() {
             return mCrimes.size();
+        }
+
+        @Override
+        public int getItemViewType(int position) {
+            return mCrimes.get(position).isRequiresPolice() ? REQUIRES_POLICE_CRIME_HOLDER_VIEW_TYPE : CRIME_HOLDER_VIEW_TYPE;
         }
     }
 }
