@@ -8,6 +8,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 import com.bignerdranch.android.criminalintent.CrimeDbSchema.CrimeTable;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -71,6 +72,11 @@ public class CrimeLab {
         } finally {
             cursor.close();
         }
+    }
+
+    public File getPhotFile(Crime crime) {
+        File filsDir = mContext.getFilesDir();
+        return new File(filsDir, crime.getPhotoFilename());
     }
 
     public void updateCrime(Crime crime) {
