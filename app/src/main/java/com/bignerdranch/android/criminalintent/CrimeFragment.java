@@ -1,5 +1,6 @@
 package com.bignerdranch.android.criminalintent;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -7,11 +8,12 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.ContactsContract;
-import android.support.annotation.CheckResult;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.ShareCompat;
+import android.support.v4.content.ContextCompat;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.text.format.DateFormat;
@@ -33,12 +35,13 @@ import static android.widget.CompoundButton.*;
  */
 
 public class CrimeFragment extends Fragment {
-
+    
     private static final String ARG_CRIME_ID = "crime_id";
     private static final String DIALOG_DATE = "DialogDate";
 
     private static final int REQUEST_DATE = 0;
     private static final int REQUEST_CONTACT = 1;
+    private static final int REQUEST_READ_CONTACTS_PERMISSION = 2;
 
     private Crime mCrime;
     private EditText mTitleField;
@@ -46,6 +49,9 @@ public class CrimeFragment extends Fragment {
     private CheckBox mSolvedCheckBox;
     private Button mSuspectButton;
     private Button mReportButton;
+    private Button mDialButton;
+
+    private final Intent pickContact = new Intent(Intent.ACTION_PICK, ContactsContract.Contacts.CONTENT_URI);
 
     public static CrimeFragment newInstance(UUID crimeID) {
         Bundle args = new Bundle();
@@ -127,17 +133,32 @@ public class CrimeFragment extends Fragment {
             }
         });
 
-        final Intent pickContact = new Intent(Intent.ACTION_PICK, ContactsContract.Contacts.CONTENT_URI);
         mSuspectButton = (Button) v.findViewById(R.id.crime_suspect);
         mSuspectButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                startActivityForResult(pickContact, REQUEST_CONTACT);
+                if (hasReadContactsPermission()) {
+                    startActivityForResult(pickContact, REQUEST_CONTACT);
+                } else {
+                    requestPermissions(new String[] { Manifest.permission.READ_CONTACTS }, REQUEST_READ_CONTACTS_PERMISSION);
+                }
+            }
+        });
+
+        mDialButton = (Button) v.findViewById(R.id.crime_dial);
+        mDialButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialPhoneNumber(mCrime.getPhoneNumber());
             }
         });
 
         if (mCrime.getSuspect() != null) {
             mSuspectButton.setText(mCrime.getSuspect());
+        }
+
+        if (mCrime.getPhoneNumber() == null) {
+            mDialButton.setEnabled(false);
         }
 
         PackageManager packageManager = getActivity().getPackageManager();
@@ -163,8 +184,11 @@ public class CrimeFragment extends Fragment {
             mCrime.setDate(date);
             updateDate();
         } else if (requestCode == REQUEST_CONTACT && data != null) {
+            String contactLookupKey;
             Uri contactUri = data.getData();
-            String[] queryFields = new String[] { ContactsContract.Contacts.DISPLAY_NAME };
+            String[] queryFields = new String[] {
+                    ContactsContract.Contacts.LOOKUP_KEY,
+                    ContactsContract.Contacts.DISPLAY_NAME };
             Cursor c = getActivity().getContentResolver().query(contactUri, queryFields, null, null, null);
 
             try {
@@ -173,13 +197,52 @@ public class CrimeFragment extends Fragment {
                 }
 
                 c.moveToFirst();
-                String suspect = c.getString(0);
+                int lookupColumn = c.getColumnIndex(ContactsContract.Contacts.LOOKUP_KEY);
+                int nameColumn = c.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME);
+
+                contactLookupKey = c.getString(lookupColumn);
+                String suspect = c.getString(nameColumn);
                 mCrime.setSuspect(suspect);
                 mSuspectButton.setText(suspect);
             } finally {
                 c.close();
             }
+
+            contactUri = ContactsContract.CommonDataKinds.Phone.CONTENT_URI;
+            queryFields = new String[] {
+                    ContactsContract.CommonDataKinds.Phone.NUMBER
+            };
+            c = getActivity().getContentResolver().query(contactUri,
+                    queryFields,
+                    ContactsContract.CommonDataKinds.Phone.LOOKUP_KEY + " = ? ",
+                    new String[] { contactLookupKey },
+                    null);
+
+            try {
+                if (c.getCount() == 0) {
+                    return;
+                }
+
+                c.moveToFirst();
+                String phone = c.getString(0);
+
+                mDialButton.setEnabled(true);
+                mCrime.setPhoneNumber(phone);
+            } finally {
+                c.close();
+            }
         }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        switch (requestCode) {
+            case REQUEST_READ_CONTACTS_PERMISSION:
+                if (hasReadContactsPermission()) {
+                    startActivityForResult(pickContact, REQUEST_CONTACT);
+                }
+        }
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
     private void updateDate() {
@@ -207,5 +270,19 @@ public class CrimeFragment extends Fragment {
         String report = getString(R.string.crime_report, mCrime.getTitle(), dateString, solvedString, suspect);
 
         return report;
+    }
+
+    private boolean hasReadContactsPermission() {
+        int result = ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.READ_CONTACTS);
+
+        return result == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void dialPhoneNumber(String phoneNumber) {
+        Intent intent = new Intent(Intent.ACTION_DIAL);
+        intent.setData(Uri.parse("tel:" + phoneNumber));
+        if (intent.resolveActivity(getActivity().getPackageManager()) != null) {
+            startActivity(intent);
+        }
     }
 }
