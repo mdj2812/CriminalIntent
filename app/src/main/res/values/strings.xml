@@ -20,4 +20,5 @@
     <string name="send_report">Send crime report via</string>
     <string name="crime_photo_description">Photo of Crime</string>
     <string name="crime_camera_description">Use Camera</string>
+    <string name="date_format">MM-dd-yyyy hh:mm:ss a</string>
 </resources>
